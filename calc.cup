@@ -1,0 +1,203 @@
+import java_cup.runtime.*;
+import java.util.*;
+
+parser code {:
+    scanner s;
+    parser(scanner s) { this.s = s; }
+
+    // Tabela de simbolos simples para analise semantica
+    Map<String, Object> varTable = new HashMap<>();
+:}
+
+scan with {: return s.next_token(); :};
+
+/* ── Terminais ── */
+terminal            SEMI, COMMA, ASSIGN;
+terminal            PLUS, MINUS, TIMES, DIV;
+terminal            EQ, NEQ, LT, GT, LE, GE;
+terminal            LPAREN, RPAREN, LBRACE, RBRACE;
+terminal            KW_INT, KW_FLOAT, KW_STRING, KW_VOID;
+terminal            KW_IF, KW_ELSE, KW_WHILE, KW_RETURN, KW_PRINT;
+terminal Integer    INT_LIT;
+terminal Double     FLOAT_LIT;
+terminal String     STR_LIT, ID;
+
+/* ── Não-terminais ── */
+non terminal            program, stmt_list, stmt, block;
+non terminal            decl_stmt, assign_stmt, if_stmt, while_stmt;
+non terminal            return_stmt, print_stmt, func_def;
+non terminal            param_list, param, arg_list;
+non terminal String     type;
+non terminal Object     expr;
+
+/* ── Precedência ── */
+precedence left PLUS, MINUS;
+precedence left TIMES, DIV;
+precedence left EQ, NEQ, LT, GT, LE, GE;
+precedence right ASSIGN;
+
+/* ══════════════════════════════════
+   Estrutura do programa
+   ══════════════════════════════════ */
+program ::= stmt_list
+;
+
+stmt_list ::= stmt_list stmt
+            | /* vazio */
+;
+
+/* ══════════════════════════════════
+   Statements
+   ══════════════════════════════════ */
+stmt ::= decl_stmt
+       | assign_stmt
+       | if_stmt
+       | while_stmt
+       | return_stmt
+       | print_stmt
+       | func_def
+       | expr:e SEMI       {: System.out.println("[expr] = " + e); :}
+;
+
+block ::= LBRACE stmt_list RBRACE
+;
+
+/* ══════════════════════════════════
+   Tipos
+   ══════════════════════════════════ */
+type ::= KW_INT            {: RESULT = "int";    :}
+       | KW_FLOAT          {: RESULT = "float";  :}
+       | KW_STRING         {: RESULT = "string"; :}
+       | KW_VOID           {: RESULT = "void";   :}
+;
+
+/* ══════════════════════════════════
+   Declaração de variáveis
+   ══════════════════════════════════ */
+decl_stmt ::= type:t ID:name SEMI
+    {:
+        parser.varTable.put(name, null);
+        System.out.println("[decl] " + t + " " + name);
+    :}
+    | type:t ID:name ASSIGN expr:e SEMI
+    {:
+        parser.varTable.put(name, e);
+        System.out.println("[decl] " + t + " " + name + " = " + e);
+    :}
+;
+
+/* ══════════════════════════════════
+   Atribuição
+   ══════════════════════════════════ */
+assign_stmt ::= ID:name ASSIGN expr:e SEMI
+    {:
+        if (!parser.varTable.containsKey(name)) {
+            System.err.println("[ERRO semantico] Variavel nao declarada: " + name);
+        } else {
+            parser.varTable.put(name, e);
+            System.out.println("[assign] " + name + " = " + e);
+        }
+    :}
+;
+
+/* ══════════════════════════════════
+   if-else
+   ══════════════════════════════════ */
+if_stmt ::= KW_IF LPAREN expr:cond RPAREN block
+    {:
+        System.out.println("[if] condicao = " + cond);
+    :}
+    | KW_IF LPAREN expr:cond RPAREN block KW_ELSE block
+    {:
+        System.out.println("[if-else] condicao = " + cond);
+    :}
+;
+
+/* ══════════════════════════════════
+   while
+   ══════════════════════════════════ */
+while_stmt ::= KW_WHILE LPAREN expr:cond RPAREN block
+    {:
+        System.out.println("[while] condicao = " + cond);
+    :}
+;
+
+/* ══════════════════════════════════
+   return
+   ══════════════════════════════════ */
+return_stmt ::= KW_RETURN expr:e SEMI
+    {:
+        System.out.println("[return] " + e);
+    :}
+    | KW_RETURN SEMI
+    {:
+        System.out.println("[return] void");
+    :}
+;
+
+/* ══════════════════════════════════
+   print
+   ══════════════════════════════════ */
+print_stmt ::= KW_PRINT LPAREN expr:e RPAREN SEMI
+    {:
+        System.out.println("[print] " + e);
+    :}
+;
+
+/* ══════════════════════════════════
+   Definição de função
+   ══════════════════════════════════ */
+func_def ::= type:t ID:name LPAREN param_list RPAREN block
+    {:
+        System.out.println("[func] " + t + " " + name + "(...)");
+    :}
+    | type:t ID:name LPAREN RPAREN block
+    {:
+        System.out.println("[func] " + t + " " + name + "()");
+    :}
+;
+
+param_list ::= param_list COMMA param
+             | param
+;
+
+param ::= type:t ID:name
+    {:
+        System.out.println("[param] " + t + " " + name);
+    :}
+;
+
+/* ══════════════════════════════════
+   Expressões
+   ══════════════════════════════════ */
+expr ::= expr:e1 PLUS  expr:e2   {: RESULT = (e1 instanceof Integer && e2 instanceof Integer) ? (Integer)e1 + (Integer)e2 : e1 + "+" + e2; :}
+       | expr:e1 MINUS expr:e2   {: RESULT = (e1 instanceof Integer && e2 instanceof Integer) ? (Integer)e1 - (Integer)e2 : e1 + "-" + e2; :}
+       | expr:e1 TIMES expr:e2   {: RESULT = (e1 instanceof Integer && e2 instanceof Integer) ? (Integer)e1 * (Integer)e2 : e1 + "*" + e2; :}
+       | expr:e1 DIV   expr:e2   {: RESULT = (e1 instanceof Integer && e2 instanceof Integer && (Integer)e2 != 0) ? (Integer)e1 / (Integer)e2 : e1 + "/" + e2; :}
+       | expr:e1 EQ    expr:e2   {: RESULT = e1 + "==" + e2; :}
+       | expr:e1 NEQ   expr:e2   {: RESULT = e1 + "!=" + e2; :}
+       | expr:e1 LT    expr:e2   {: RESULT = e1 + "<"  + e2; :}
+       | expr:e1 GT    expr:e2   {: RESULT = e1 + ">"  + e2; :}
+       | expr:e1 LE    expr:e2   {: RESULT = e1 + "<=" + e2; :}
+       | expr:e1 GE    expr:e2   {: RESULT = e1 + ">=" + e2; :}
+       | MINUS expr:e            {: RESULT = (e instanceof Integer) ? -(Integer)e : "-" + e; :}
+       | LPAREN expr:e RPAREN    {: RESULT = e; :}
+       | INT_LIT:n               {: RESULT = n; :}
+       | FLOAT_LIT:f             {: RESULT = f; :}
+       | STR_LIT:s               {: RESULT = s; :}
+       | ID:name
+    {:
+        if (!parser.varTable.containsKey(name)) {
+            System.err.println("[ERRO semantico] Variavel nao declarada: " + name);
+            RESULT = 0;
+        } else {
+            RESULT = parser.varTable.get(name);
+        }
+    :}
+       | ID:name LPAREN arg_list RPAREN  {: RESULT = name + "(...)"; :}
+       | ID:name LPAREN RPAREN           {: RESULT = name + "()";    :}
+;
+
+arg_list ::= arg_list COMMA expr
+           | expr
+;

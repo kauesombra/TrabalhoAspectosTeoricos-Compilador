@@ -1,0 +1,26 @@
+// Declaracao de variaveis
+int x = 10;
+int y = 3;
+float z = 3.14;
+string msg = "ola mundo";
+
+// Definicao de funcao
+int soma(int a, int b) {
+    return a + b;
+}
+
+//  if-else
+if (x == 10) {
+    y = y + 1;
+} else {
+    y = y - 1;
+}
+
+//  while
+while (x != 0) {
+    x = x - 1;
+}
+
+// Print
+print(msg);
+print(soma(x, y));
